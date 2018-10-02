@@ -5,9 +5,11 @@ export enum AnswerType{
 
 export interface IAnswer{
     answerType: AnswerType
-    numericAnswer: number
-    textAnswer: string
-    answerPrecision: number
-    answerRegex: string
+    numericAnswer?: number
+    textAnswer?: string
+    answerPrecision?: number
+    answerRegex?: string
+
+    [key: string]: any
 
 }

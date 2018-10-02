@@ -1,8 +1,8 @@
 import { Question }  from '../schemas/question'
 import { Request, Response } from 'express'
 import { User } from '../schemas/user'
-import { QuestionType } from '../interfaces/question'
-import { AnswerType } from '../interfaces/answer';
+import { QuestionType, IQuestion } from '../interfaces/question'
+import { AnswerType, IAnswer } from '../interfaces/answer';
 import { IAnsweredQuestion } from '../interfaces/user'
 import { Types } from 'mongoose';
 
@@ -19,6 +19,100 @@ class QuestionsApi{
         this.checkAnswer = this.checkAnswer.bind(this)
         this.getBonusQuestions = this.getBonusQuestions.bind(this)
         this.getQuestions = this.getQuestions.bind(this)
+        this.createQuestion = this.createQuestion.bind(this)
+    }
+
+    public deleteQuestion(req: Request, res: Response){
+        const questionId: string = req.body.id
+
+        Question.findByIdAndDelete(questionId)
+                .then(() => res.sendStatus(200))
+                .catch((err) => {
+                    console.log(`Error deleting question: ${err}`)
+                    res.sendStatus(400)
+                })
+    }
+
+    public updateQuestion(req: Request, res: Response){
+        const answer: IAnswer = req.body.answerisNumeric?{
+            answerType: AnswerType.numeric,
+            numericAnswer: req.body.answer,
+            answerPrecision: req.body.answerPrecision
+        }:{
+            answerType: AnswerType.text,
+            textAnswer: req.body.answer,
+            answerRegex: req.body.answerRegex
+        }
+
+        const setAnswer: any = {}
+
+        for( var key in answer ){
+            if(answer[key]){
+                setAnswer[key] = answer[key]
+            }
+        }
+        
+        const question: IQuestion = {
+            round: req.body.round,
+            point: req.body.point,
+            type: req.body.bonus? QuestionType.bonus: QuestionType.regular,
+            title: req.body.title,
+            description: req.body.description,
+            imageURL: req.body.imageURL,
+            answer
+        }
+
+        const setQuestion: any = {}
+
+        for( var key in question ){
+            if(question[key] && key !== 'answer'){
+                setQuestion[key] = question[key]
+            }
+        }
+
+        const questionId: string = req.body.id
+
+        Question.findByIdAndUpdate(
+            questionId,{
+            $set: setQuestion,
+            answer: { $set: setAnswer}
+        },{new:true}).then(question => {
+            res.json({question})
+        }).catch( err => {
+            res.sendStatus(400)
+        })
+    }
+
+    public createQuestion(req: Request, res: Response){  // POST
+        
+        const answer: IAnswer = req.body.answerisNumeric?{
+            answerType: AnswerType.numeric,
+            numericAnswer: req.body.answer,
+            answerPrecision: req.body.answerPrecision
+        }:{
+            answerType: AnswerType.text,
+            textAnswer: req.body.answer,
+            answerRegex: req.body.answerRegex
+        }
+        
+        const question: IQuestion = {
+            round: req.body.round,
+            point: req.body.point,
+            type: req.body.bonus? QuestionType.bonus: QuestionType.regular,
+            title: req.body.title,
+            description: req.body.description,
+            imageURL: req.body.imageURL,
+            answer
+        }
+
+        Question.create(question)
+                .then( newQuestion => {
+                    res.json({question: newQuestion})
+                })
+                .catch( err => {
+                    console.log(`Error creating question: ${err}`)
+                    res.sendStatus(500)
+                } )
     }
 
     public checkAnswer(req: Request, res: Response){     // POST
@@ -43,13 +137,13 @@ class QuestionsApi{
                                     }else if(question.answer.answerType === AnswerType.numeric){
                                         if(typeof answer !== 'number' ){
                                             res.sendStatus(400)
-                                        }else{
+                                        }else if(question.answer.numericAnswer && question.answer.answerPrecision){
                                             isAnswerCorrect = Math.abs(question.answer.numericAnswer - answer) >= question.answer.answerPrecision
                                         }
                                     }else if(question.answer.answerType === AnswerType.text){
                                         if(typeof answer !== 'string'){
                                             res.sendStatus(400)
-                                        }else{
+                                        }else if(question.answer.answerRegex){
                                             isAnswerCorrect = RegExp(question.answer.answerRegex).test(answer)
                                         }
                                     }else{

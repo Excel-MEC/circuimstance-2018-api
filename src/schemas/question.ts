@@ -10,8 +10,14 @@ export const QuestionSchema: Schema = new Schema({
     point: Number,
     type: Number,
     title: String,
-    description: String,
-    imageURL: String,
+    description: {
+        type: String,
+        required: false
+    },
+    imageURL: {
+        type: String,
+        required: false
+    },
     answer: {
         answerType: Number,
         numericAnswer: Number,

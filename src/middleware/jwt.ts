@@ -1,6 +1,9 @@
 import * as jwt from 'express-jwt'
 
-export function JWTMiddleware(secret: string, exclude: string[]){
+import { JWT_SECRET } from '../config/jwt'
+
+export function getJWTMiddleware(exclude: string[]){
+    let secret = JWT_SECRET
     return jwt({secret}).unless({
         path: exclude
     })

@@ -9,8 +9,11 @@ export interface IQuestion{
     point: number
     type: QuestionType
     title: string
-    description: string
-    imageURL: string
+    description?: string
+    imageURL?: string
     answer: IAnswer 
+
+    [key: string]: any
+
 }
 

@@ -1,8 +1,20 @@
-import app from './App'
 import { ErrorRequestHandler } from 'express'
 import * as mongoose from 'mongoose'
+import * as dotenv from 'dotenv'
+import * as path from 'path' 
 
+
+dotenv.config({
+    path: path.resolve(process.cwd(),'.env')
+})
+
+import app from './App'
 import { MONGO_CONN_STRING } from './config/mongodb'
+
+
+
+
+
 
 // port to listen on
 const port  = process.env.PORT || 4000

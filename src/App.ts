@@ -5,6 +5,7 @@ import userRouter from './routers/user'
 import adminRouter from './routers/admin'
 
 import { getJWTMiddleware } from './middleware/jwt'
+import { Socket } from "./utils/socket";
 
 
 const UNSECURE_ROUES = [
@@ -28,6 +29,8 @@ class App{
     }
 
     private attachMiddleware(): void{
+        // json parser
+        this.express.use(express.json())
         // jwt middleware
         let jwtmiddleware = getJWTMiddleware(UNSECURE_ROUES)
         this.express.use(jwtmiddleware)
@@ -35,4 +38,13 @@ class App{
 }
 
 
-export default new App().express
+const app = new App().express
+
+
+// add websockets to express server
+const socketServer = new Socket(app)
+
+// export socketserver
+export const socketio = socketServer.io
+
+export default socketServer.server

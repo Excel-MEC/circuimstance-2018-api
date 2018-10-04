@@ -5,7 +5,8 @@ import { QuestionType, IQuestion } from '../interfaces/question'
 import { AnswerType, IAnswer } from '../interfaces/answer';
 import { IAnsweredQuestion } from '../interfaces/user'
 import { Types } from 'mongoose';
-
+import LeaderboardApi from './leaderboard'
+import { promisify } from 'util';
 export interface UserEligibility{
     roundEligible: number
     bonusEligible: boolean
@@ -168,6 +169,7 @@ class QuestionsApi{
                                     res.sendStatus(401)
                                 }
                             })
+                            .catch( (err) => console.log(`Error checking answer: ${err}`))
                         }
                 })
 
@@ -261,7 +263,11 @@ class QuestionsApi{
                         },{
                             $set:{ roundCleared: (roundCleared && !isBonus), score: (score + point), lastScoreUpdate: now }
                         })
-                         .then( () => resolve() )
+                         .then( () => {
+                            promisify(LeaderboardApi.updateScore)(userId,score+point,now)
+                            .then( () => resolve())
+                            .catch(() => reject())                            
+                        })
                          .catch( err => reject(err))
                     } )
                     .catch( err => reject(err))

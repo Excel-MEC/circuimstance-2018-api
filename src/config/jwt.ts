@@ -1,5 +1,4 @@
 import * as jwt from 'jsonwebtoken'
-import * as expressjwt from 'express-jwt'
 
 function getJWTSecret(): string{
     let jwtsecret = process.env.JWT_SECRET
@@ -10,13 +9,24 @@ function getJWTSecret(): string{
     return jwtsecret
 }
 
+
+function getJWTExpireTime(): string{
+    let jwtexpiry = process.env.JWT_EXPIRY
+    if(!jwtexpiry){
+        throw Error(`Set JWT_EXPIRY environment variable`)
+    }
+
+    return jwtexpiry
+}
+
 export const JWT_SECRET = getJWTSecret()
+export const JWT_EXPIRY = getJWTExpireTime()
 export const sign = (userId: string,admin: boolean) :string => {
     return jwt.sign({
         id: userId,
         admin
     }, JWT_SECRET, {
         algorithm: 'HS256',
-        expiresIn: '12h'
+        expiresIn: JWT_EXPIRY
     })
 }

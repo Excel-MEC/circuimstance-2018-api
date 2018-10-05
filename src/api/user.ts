@@ -50,7 +50,6 @@ class UserApi{
 
         this.verifyIdToken(IdToken)
              .then(payload => {
-
                 if(!payload){
                     res.sendStatus(401)
                 }else{
@@ -74,17 +73,32 @@ class UserApi{
                                     }
                                 })
                             }else{
-                                res.json(this.createToken(user))
+                                user.set({
+                                    email: authResponse.email || user.email,
+                                    fullName: authResponse.name || user.fullName,
+                                    imageURL: authResponse.imageURL || user.imageURL
+                                })
+
+                                user.save((err,user_) => {
+                                    if(err){
+                                        console.log(`Error upserting user: ${err}`)
+                                        res.sendStatus(401)
+                                    }else{
+                                        res.json(this.createToken(user_))
+                                    }
+                                })
                             }
                         }).catch( () => res.sendStatus(401))
                 }
-             }).catch( () => res.sendStatus(401))
+             }).catch( () => {
+                 console.log("could not verify the authenticty of the tokenid")
+                 res.sendStatus(401)
+            })
 
     }
     private client = new OAuth2Client(googleAuthConfig.clientID)
 
     private  verifyIdToken(idToken: string){
-
         return new Promise<TokenPayload>((resolve,reject) => {
             this.client.verifyIdToken({
                 idToken,
@@ -104,7 +118,7 @@ class UserApi{
     }
 
     private createToken(user: IUserModel) : {token: string}{
-        const token: string = sign(user._id, user.type === UserType.admin)
+        const token: string = sign(user._id.toString(), user.type === UserType.admin)
         return {token}
     }
 }

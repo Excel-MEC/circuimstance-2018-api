@@ -13,9 +13,13 @@ class LeaderboardApi{
 
     private TIME_MIN: number
     
-    public async onClientJoin(socket: Socket){
-        const snapshot = await this.getLeaderboardSnapShot()
-        socket.emit(LEADERBOARD_SNAPSHOT,{snapshot})
+    public onClientJoin(socket: Socket){
+        console.log("WS client connected")
+        this.getLeaderboardSnapShot()
+            .then( snapshot => {
+                socket.emit(LEADERBOARD_SNAPSHOT,{snapshot})
+                console.log("leaderboard snapshot sent")
+            })
     }
 
     public async forcePopulateZset(req: Request, res: Response){
@@ -28,45 +32,57 @@ class LeaderboardApi{
         }
     }
 
-    public updateScore(userId: string, score: number, lastScoreUpdate: Date){
+    public async updateScore(userId: string, score: number, lastScoreUpdate: Date){
         const delta = lastScoreUpdate.getSeconds() - this.TIME_MIN
+        console.log("adding score to zset")
         this.zset.zadd(score - Math.tanh(delta) ,userId)
-        promisify(this.getLeaderboardSnapShot)()
-        .then(snapshot => socketio.emit(LEADERBOARD_SNAPSHOT,{snapshot}))
-        .catch( err => console.log(`Error emitting ${LEADERBOARD_SNAPSHOT}: ${err}`))
+
+        var snapshot: any
+
+        try{
+            snapshot = await this.getLeaderboardSnapShot() 
+        }catch(e){
+            console.log('updateScore: Error fetching leaderboard snapshot')
+            return 
+        }
+        socketio.emit(LEADERBOARD_SNAPSHOT,{snapshot})
     }
 
     private async getLeaderboardSnapShot(){
         const userIds = (await this.zset.zrange(-this.count,-1)).reverse()
         const $in = userIds.map( item => Types.ObjectId(item))
-        const users = await User.find({_id: $in},{ fullName:1,score:1 })
+        const users = await User.find({_id: {$in}},{ score:1, imageURL: 1, fullName: 1 })
 
         const ranks = await Promise.all(users.map( user => 
-            this.zset.zscore(user._id)
+            this.zset.zrevrank(user._id.toString())
         ))
 
         const data: any = {}
         for(var i = 0; i < users.length; ++i){
-            data[users[i]._id] = {
-                ...users,
+            const { score, _id, fullName, imageURL } = users[i]
+            data[users[i]._id.toString()] = {
+                score,
+                fullName,
+                imageURL,
+                _id: _id.toString(),
                 rank: ranks[i]
             }
         }
 
         const dataOrdered = []
-        for(var id in userIds){
+
+        for(var id of userIds){
             dataOrdered.push(data[id])
         }
 
         return dataOrdered
     }
     
-    private async populateZset(){
+    public async populateZset(){
+        console.log("Populating redis")
         await this.zset.del()
         const userlist = await User.find({},{_id:1,score:1, lastScoreUpdate:1})
         const firstUser = await User.findOne({},{lastScoreUpdate: 1}).sort({lastScoreUpdate:-1})
-        
-
         if(!firstUser){
             throw Error(`Cannot find start time`)
         }
@@ -76,8 +92,10 @@ class LeaderboardApi{
         for(var i = 0; i < userlist.length; ++i ){
             const user = userlist[i]
             const delta = user.lastScoreUpdate.getSeconds() - firstUser.lastScoreUpdate.getSeconds()
-            await this.zset.zadd(user.score - Math.tanh(delta),user._id)
+            await this.zset.zadd(user.score - Math.tanh(delta),user._id.toString())
         }
+
+        console.log("Done populating redis cache")
 
     }
 
@@ -85,7 +103,7 @@ class LeaderboardApi{
         this.TIME_MIN = 0
         this.onClientJoin = this.onClientJoin.bind(this)
         this.updateScore = this.updateScore.bind(this)
-        this.populateZset()        
+        this.populateZset = this.populateZset.bind(this)
     }
 }
 

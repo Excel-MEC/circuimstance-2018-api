@@ -3,13 +3,17 @@ import * as mongoose from 'mongoose'
 import * as dotenv from 'dotenv'
 import * as path from 'path' 
 
-
 dotenv.config({
     path: path.resolve(process.cwd(),'.env')
 })
 
+import LeaderboardApi from './api/leaderboard'
 import app from './App'
 import { MONGO_CONN_STRING } from './config/mongodb'
+import { promisify } from 'util'
+
+import './routers/ws'
+
 
 
 
@@ -21,9 +25,17 @@ const port  = process.env.PORT || 4000
 
 Promise.all([
     //connect to db
-    mongoose.connect(MONGO_CONN_STRING)
+    (() => {
+        console.log('connecting to db')
+        return mongoose.connect(MONGO_CONN_STRING,{ useNewUrlParser: true })}
+    )(),
 
-]).then( () => {
+]).then( async () => {
+    // populate the redis zset
+    promisify(LeaderboardApi.populateZset)()
+
+
+    console.log("starting the app...")
     // start the app
     app.listen(port,(err: ErrorRequestHandler ) => {
         if(err){

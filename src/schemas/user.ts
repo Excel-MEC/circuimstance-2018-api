@@ -12,9 +12,15 @@ export const UserSchema: Schema = new Schema({
         match: /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/
     },
     
-    fullName: String,
+    fullName: {
+        type: String,
+        required: true
+    },
     
-    providerId: String,
+    providerId: {
+        type: String,
+        required: true
+    },
     imageURL: {
         type: String,
         required: false

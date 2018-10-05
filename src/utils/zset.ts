@@ -5,6 +5,7 @@ import { RedisClient } from 'redis'
 import { REDIS_ZSET_NAME, redisClient  } from '../config/redis'
 class ZSet{
 
+
     private zset_name: string = REDIS_ZSET_NAME
     private redis_client: RedisClient = redisClient
 

@@ -3,6 +3,8 @@ import authRouter from './routers/auth'
 import questionRouter from './routers/question'
 import userRouter from './routers/user'
 import adminRouter from './routers/admin'
+import * as cors from 'cors'
+
 
 import { getJWTMiddleware } from './middleware/jwt'
 import { Socket } from "./utils/socket";
@@ -29,6 +31,8 @@ class App{
     }
 
     private attachMiddleware(): void{
+        // cors
+        this.express.use(cors())
         // json parser
         this.express.use(express.json())
         // jwt middleware

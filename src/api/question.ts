@@ -1,4 +1,4 @@
-import { Question }  from '../schemas/question'
+import { Question, IQuestionModel }  from '../schemas/question'
 import { Request, Response } from 'express'
 import { User } from '../schemas/user'
 import { QuestionType, IQuestion } from '../interfaces/question'
@@ -116,62 +116,102 @@ class QuestionsApi{
                 } )
     }
 
-    public checkAnswer(req: Request, res: Response){     // POST
-        const questionId: string = req.body.id
+    public async checkAnswer(req: Request, res: Response){
+        const questionId: string | undefined = req.body.id
+
+        if( typeof questionId !== 'string'){
+            console.log('checkAnswer: Invalid question id')
+            return res.sendStatus(400)
+        }
+
         const answer: string | number = req.body.answer
-        this.getUserEligibility(req.user.id)
-            .then((userEligibility: UserEligibility) => {
-                if(userEligibility.answeredQuestions.filter(item => item.questionId === questionId).length > 0){
-                    res.sendStatus(401)
-                }else{
-                    Question.findOne(questionId)
-                            .then(question => {
-                                if(!question){
-                                    res.sendStatus(400)
-                                }else if(question.round === userEligibility.roundEligible ){
-                                    
-                                    var isAnswerCorrect: boolean = false
-                                    
-                                    // if the user is attempting a bonus question with being eligible for it
-                                    if(question.type === QuestionType.bonus && !userEligibility.bonusEligible){
-                                        res.sendStatus(401)
-                                    }else if(question.answer.answerType === AnswerType.numeric){
-                                        if(typeof answer !== 'number' ){
-                                            res.sendStatus(400)
-                                        }else if(question.answer.numericAnswer && question.answer.answerPrecision){
-                                            isAnswerCorrect = Math.abs(question.answer.numericAnswer - answer) >= question.answer.answerPrecision
-                                        }
-                                    }else if(question.answer.answerType === AnswerType.text){
-                                        if(typeof answer !== 'string'){
-                                            res.sendStatus(400)
-                                        }else if(question.answer.answerRegex){
-                                            isAnswerCorrect = RegExp(question.answer.answerRegex).test(answer)
-                                        }
-                                    }else{
-                                        console.log(`Encountered unknown answer type`)
-                                        res.sendStatus(500)
-                                    }
 
-                                    if(isAnswerCorrect){
-                                        this.updateUserScore(req.user.id,questionId,question.point,
-                                                    userEligibility.roundEligible,userEligibility.score,
-                                                    question.type === QuestionType.bonus)
-                                            .then( () => {
-                                                res.sendStatus(200)
-                                            })
-                                            .catch((err: any) => {
-                                                console.log(`Error while updating user(${req.user.id}) score: ${err}`)
-                                                res.sendStatus(500)
-                                            })
-                                    }
+        if( typeof answer !== 'string' && typeof answer !== 'number' ){
+            console.log('checkAnswer: Invalid answer type')
+            return res.sendStatus(400)
+        }
 
-                                }else{
-                                    res.sendStatus(401)
-                                }
-                            })
-                            .catch( (err) => console.log(`Error checking answer: ${err}`))
-                        }
-                })
+        var user: UserEligibility;
+
+        try{
+            user = await this.getUserEligibility(req.user.id)
+        }catch(e){
+            console.log('checkAnswer: Unable to fetch user: ',e)
+            return res.sendStatus(500)
+        } 
+
+        // check if question is already answered
+        const eligibleQuestion: IAnsweredQuestion[] = user.answeredQuestions.filter( q => q.questionId.toString() === questionId)
+
+        if(eligibleQuestion.length > 0){
+            console.log('checkAnswer: Question already answered')
+            return res.sendStatus(401)
+        }
+
+        var question: IQuestionModel | null;
+
+        try{
+            question = await Question.findById(questionId)
+        }catch(e){
+            console.log('checkAnwer: Error fetching question: ',e)
+            return res.sendStatus(500)
+        }
+
+        if(!question){
+            console.log('checkAnswer: Question not found')
+            return res.sendStatus(400)
+        }
+
+        if(question.round !== user.roundEligible){
+            console.log('checkAnswer: User not eligible for the round')
+            return res.sendStatus(401)
+        }
+
+        let isAnswerCorrect: boolean = false
+
+        if( question.type === QuestionType.bonus && !user.bonusEligible){
+            console.log('checkAnswer: User not eligible for bonus question')
+            return res.sendStatus(401)
+        }
+        
+        if( question.answer.answerType === AnswerType.numeric){
+            if(!question.answer.numericAnswer || !question.answer.answerPrecision){
+                console.log('answerCheck: Error in question format')
+                return res.sendStatus(500)
+            }
+            if(typeof answer === 'number'){
+                isAnswerCorrect = Math.abs(question.answer.numericAnswer - answer) <= question.answer.answerPrecision
+            }else{
+                console.log('checkAnswer: Expected numeric answer')
+                return res.sendStatus(400)
+            }
+        }else{
+            if(!question.answer.textAnswer || !question.answer.answerRegex){
+                console.log('answerCheck: Error in question format')
+                return res.sendStatus(500)
+            }
+
+            if(typeof answer === 'string'){
+                isAnswerCorrect = RegExp(question.answer.answerRegex).test(answer)
+            }else{
+                console.log('checkAnswer: Expected text answer')
+                return res.sendStatus(400)
+            }
+
+        }
+
+        if(isAnswerCorrect){
+            try{
+                await this.updateUserScore(req.user.id,questionId,question.point,question.round,user.score,user.bonusEligible)
+            }catch(e){
+                console.log('answerCheck: Error updating score')
+                return res.sendStatus(500)
+            }
+
+            return res.json({ correct: true })
+        }
+
+        return res.json({correct: false })
 
     }
 
@@ -186,7 +226,7 @@ class QuestionsApi{
                 },{ answer: 0 })
                 .then(questions => {
 
-                    let answeredQuestions: string[] = userEligibility.answeredQuestions.map( item => item.questionId)
+                    let answeredQuestions: string[] = userEligibility.answeredQuestions.map( item => item.questionId.toString())
                     res.json({
                         questions,
                         answeredQuestions
@@ -226,9 +266,9 @@ class QuestionsApi{
             })
     }
 
-    private getUserEligibility(userId: number){
+    private getUserEligibility(userId: string){
         return new Promise<UserEligibility>((resolve,reject) => {
-            User.findById(userId,{roundCleared: 1, round: 1, answeredQuestions: 1})
+            User.findById(userId,{roundCleared: 1, round: 1, answeredQuestions: 1, score: 1})
                 .then( (res) => {
 
                     if(!res){
@@ -252,21 +292,31 @@ class QuestionsApi{
     }
 
     private updateUserScore(userId: string,questionId: string,point: number,round: number, score: number, isBonus: boolean){
-        return new Promise<void>((resolve,reject) => {
+        return new Promise<void>(async (resolve,reject) => {
             Question.find({round, type: QuestionType.regular})
                     .then( res => {
                         let points: number = res.map(item => item.point).reduce((acc,cur) => acc+cur)
                         let roundCleared: boolean = (score + point) >= points
                         let now: Date = new Date()
+                        let $set: any = { roundCleared: (roundCleared && !isBonus), score: (score + point), lastScoreUpdate: now }
+                        let $push: any = { answeredQuestions: <IAnsweredQuestion>{
+                            questionId,
+                            round
+                        } }
                         User.updateOne({
                             _id: Types.ObjectId(userId),
                         },{
-                            $set:{ roundCleared: (roundCleared && !isBonus), score: (score + point), lastScoreUpdate: now }
+                            $set,
+                            $push
                         })
-                         .then( () => {
-                            promisify(LeaderboardApi.updateScore)(userId,score+point,now)
-                            .then( () => resolve())
-                            .catch(() => reject())                            
+                         .then( async () => {
+                             try{
+                                await LeaderboardApi.updateScore(userId,score+point,now)
+                             }catch(e){
+                                 console.log('updateScore: Error updating leaderboard: ',e)
+                                 reject()
+                             }
+                             resolve()
                         })
                          .catch( err => reject(err))
                     } )

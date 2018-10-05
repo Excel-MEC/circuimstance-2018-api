@@ -1,6 +1,5 @@
 import { Document, Schema, Model, model } from 'mongoose'
 import { IQuestion } from '../interfaces/question'
-import { AnswerType } from '../interfaces/answer';
 
 export interface IQuestionModel extends IQuestion, Document{
 }
@@ -19,7 +18,10 @@ export const QuestionSchema: Schema = new Schema({
         required: false
     },
     answer: {
-        answerType: Number,
+        answerType: {
+            type: Number,
+            required: true
+        },
         numericAnswer: Number,
         answerPrecision: Number,
         answerRegex: String

@@ -9,6 +9,7 @@ export class Socket{
     constructor(app: Express){
         this.server = new Server(app)
         this.io = io(this.server)
+        this.io.origins('*:*')
     }
 
 }

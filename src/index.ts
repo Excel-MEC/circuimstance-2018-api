@@ -1,7 +1,9 @@
 import { ErrorRequestHandler } from 'express'
 import * as mongoose from 'mongoose'
-import * as dotenv from 'dotenv'
+
 import * as path from 'path' 
+import * as dotenv from 'dotenv'
+
 
 dotenv.config({
     path: path.resolve(process.cwd(),'.env')
@@ -26,7 +28,7 @@ const port  = process.env.PORT || 4000
 Promise.all([
     //connect to db
     (() => {
-        console.log('connecting to db')
+        console.log('connecting to db..')
         return mongoose.connect(MONGO_CONN_STRING,{ useNewUrlParser: true })}
     )(),
 

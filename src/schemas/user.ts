@@ -1,16 +1,10 @@
 import { Document, Schema, Model, model } from 'mongoose'
-import { IUser, UserType } from '../interfaces/user'
+import { IUser } from '../interfaces/user'
 
 export interface IUserModel extends IUser, Document{
 }
 
 export const UserSchema: Schema = new Schema({
-    email:{
-        type: String,
-        required: true,
-        trim: true,
-        match: /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/
-    },
     
     fullName: {
         type: String,
@@ -38,15 +32,11 @@ export const UserSchema: Schema = new Schema({
     
     lastScoreUpdate: Date,
     
-    type: {
-        type: Number,
-        required: true,
-        default: UserType.regular
-    },
     roundCleared: { 
         type: Boolean,
         default: false
     },
+    
     answeredQuestions: [{
         round: Number,
         questionId: String

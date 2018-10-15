@@ -4,6 +4,6 @@ import { handleErrors } from '../utils/wrappers'
 
 const router: Router = Router()
 
-router.post('/', handleErrors(userApi.Authenticate))
+router.get('/', handleErrors(userApi.Authenticate))
 
 export default router

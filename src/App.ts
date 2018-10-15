@@ -2,17 +2,17 @@ import * as express from 'express'
 import authRouter from './routers/auth'
 import questionRouter from './routers/question'
 import userRouter from './routers/user'
+import roundRouter from './routers/round'
 import adminRouter from './routers/admin'
 import * as cors from 'cors'
+import * as morgan from 'morgan'
 
 
 import { getJWTMiddleware } from './middleware/jwt'
 import { Socket } from "./utils/socket";
 
 
-const UNSECURE_ROUES = [
-    '/auth'
-]
+const UNSECURE_ROUES = []
 
 class App{
     public express: express.Express
@@ -28,6 +28,7 @@ class App{
         this.express.use('/user',userRouter)
         this.express.use('/question',questionRouter)
         this.express.use('/admin',adminRouter)
+        this.express.use('/round',roundRouter)
     }
 
     private attachMiddleware(): void{
@@ -36,8 +37,11 @@ class App{
         // json parser
         this.express.use(express.json())
         // jwt middleware
-        let jwtmiddleware = getJWTMiddleware(UNSECURE_ROUES)
+        let jwtmiddleware = getJWTMiddleware([])
         this.express.use(jwtmiddleware)
+
+        // log HTTP requests
+        this.express.use(morgan('combined'));
     }
 }
 

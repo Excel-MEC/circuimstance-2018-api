@@ -6,7 +6,6 @@ import { AnswerType, IAnswer } from '../interfaces/answer';
 import { IAnsweredQuestion } from '../interfaces/user'
 import { Types } from 'mongoose';
 import LeaderboardApi from './leaderboard'
-import { promisify } from 'util';
 export interface UserEligibility{
     roundEligible: number
     bonusEligible: boolean
@@ -134,7 +133,7 @@ class QuestionsApi{
         var user: UserEligibility;
 
         try{
-            user = await this.getUserEligibility(req.user.id)
+            user = await this.getUserEligibility(req.user.sub)
         }catch(e){
             console.log('checkAnswer: Unable to fetch user: ',e)
             return res.sendStatus(500)
@@ -202,7 +201,7 @@ class QuestionsApi{
 
         if(isAnswerCorrect){
             try{
-                await this.updateUserScore(req.user.id,questionId,question.point,question.round,user.score,user.bonusEligible)
+                await this.updateUserScore(req.user.sub,questionId,question.point,question.round,user.score,user.bonusEligible)
             }catch(e){
                 console.log('answerCheck: Error updating score')
                 return res.sendStatus(500)
@@ -216,35 +215,47 @@ class QuestionsApi{
     }
 
     public getQuestions(req: Request, res: Response){    // GET
-        this.getUserEligibility(req.user.id)
+        this.getUserEligibility(req.user.sub)
             .then( (userEligibility: UserEligibility) => {
                 
                 // fetch all regular questions for the round
                 Question.find({ 
                     round: userEligibility.roundEligible, 
-                    type: QuestionType.regular,
                 },{ answer: 0 })
                 .then(questions => {
 
+                    var bonusQuestionCount = 0;
+                    const regularQuestions = []
+
+                    for(var q of questions){
+                        if(q.type === QuestionType.bonus){
+                            bonusQuestionCount++
+                        }else{
+                            regularQuestions.push(q)
+                        }
+                    }
+
+
                     let answeredQuestions: string[] = userEligibility.answeredQuestions.map( item => item.questionId.toString())
                     res.json({
-                        questions,
-                        answeredQuestions
+                        questions: regularQuestions,
+                        answeredQuestions,
+                        bonusQuestionCount
                     })
                 })
                 .catch( err => {
-                    console.log(`Error while fetching questions for round ${userEligibility.roundEligible} from user ${req.user.id}: ${err}`)
+                    console.log(`Error while fetching questions for round ${userEligibility.roundEligible} from user ${req.user.sub}: ${err}`)
                     res.sendStatus(500)
                 })
             })
             .catch( (err: string) => {
-                console.log(`Error fetching user eligible round from user ${req.user.id}: ${err}`)
+                console.log(`Error fetching user eligible round from user ${req.user.sub}: ${err}`)
                 res.sendStatus(500)
             })
     }
 
     public getBonusQuestions(req: Request, res: Response){  // GET
-        this.getUserEligibility(req.user.id)
+        this.getUserEligibility(req.user.sub)
             .then( (userEligibility: UserEligibility) => {
                 
                 // fetch all regular questions for the round
@@ -255,20 +266,20 @@ class QuestionsApi{
                     })
                 })
                 .catch( err => {
-                    console.log(`Error while fetching bonus questions for round ${userEligibility.roundEligible} from user ${req.user.id}: ${err}`)
+                    console.log(`Error while fetching bonus questions for round ${userEligibility.roundEligible} from user ${req.user.sub}: ${err}`)
                     res.sendStatus(500)
                 })
 
             })
             .catch( (err: string) => {
-                console.log(`Error fetching user eligible round from user ${req.user.id}: ${err}`)
+                console.log(`Error fetching user eligible round from user ${req.user.sub}: ${err}`)
                 res.sendStatus(500)
             })
     }
 
-    private getUserEligibility(userId: string){
+    private getUserEligibility(sub: string){
         return new Promise<UserEligibility>((resolve,reject) => {
-            User.findById(userId,{roundCleared: 1, round: 1, answeredQuestions: 1, score: 1})
+            User.findOne({sub},{roundCleared: 1, round: 1, answeredQuestions: 1, score: 1})
                 .then( (res) => {
 
                     if(!res){

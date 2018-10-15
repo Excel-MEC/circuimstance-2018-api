@@ -1,14 +1,11 @@
 import { Request, Response } from 'express'
 import { User, IUserModel } from '../schemas/user';
-import { OAuth2Client } from 'google-auth-library'
-import { googleAuthConfig } from '../config/google'
-import { TokenPayload } from 'google-auth-library/build/src/auth/loginticket';
-import { sign } from '../config/jwt'
-import { UserType } from '../interfaces/user';
+import zset from '../utils/zset';
+import LeaderboardApi from '../api/leaderboard'
 
 interface IAuthResponse{
     name: string
-    email: string
+    sub: string
     imageURL?: string
 }
 
@@ -19,108 +16,114 @@ class UserApi{
         this.Authenticate = this.Authenticate.bind(this)
     }
 
-    public getUserInfo(req: Request, res: Response): void{ //GET
-        const userId: string = req.user.id
-        User.findById(userId)
-            .then( user => {
-                if(!user){
-                    res.sendStatus(400)
-                }else{
-                    res.json({
-                        fullName: user.fullName,
-                        email: user.email,
-                        imageURL: user.imageURL,
-                        score: user.score,
-                        admin: user.type === UserType.admin,
-                        roundCleared: user.roundCleared,
-                        // TODO: add rank
-                    })
-                }
-            }).catch( () => res.sendStatus(400))
-    }
+    public async getUserInfo(req: Request, res: Response){ //GET
+        const sub: string = req.user.sub
 
-    public Authenticate(req: Request, res: Response): void{  // POST
-        const IdToken: string = req.body.idToken
+        var user;
 
-        const authResponse: IAuthResponse = {
-            imageURL: req.body.imageURL,
-            name: req.body.fullName,
-            email: req.body.email
+        try{
+            user = await User.findOne({providerId: sub}) 
+        }catch(e){
+            console.log('Error fetching user: ',e)
+            return res.sendStatus(500)
         }
 
-        this.verifyIdToken(IdToken)
-             .then(payload => {
-                if(!payload){
-                    res.sendStatus(401)
-                }else{
-                    let providerId = payload['sub']
-                    User.findOne({providerId})
-                        .then( user => {
-                            if(!user){
-                                const newUser: IUserModel = new User({
-                                    email: authResponse.email,
-                                    providerId,
-                                    fullName: authResponse.name,
-                                    imageURL: authResponse.imageURL
-                                })
+        if(!user){
+            console.log('User not found!')
+            return res.sendStatus(400)
+        }
 
-                                newUser.save((err,user) => {
-                                    if(err){
-                                        console.log(`Error upserting user: ${err}`)
-                                        res.sendStatus(401)
-                                    }else{
-                                        res.json(this.createToken(user))
-                                    }
-                                })
-                            }else{
-                                user.set({
-                                    email: authResponse.email || user.email,
-                                    fullName: authResponse.name || user.fullName,
-                                    imageURL: authResponse.imageURL || user.imageURL
-                                })
+        try{
+            await LeaderboardApi.updateScore(user._id.toString(),user.score,user.lastScoreUpdate)
+        }catch(e){
+            console.log('Error updating leaderboard: ',e)
+            return res.sendStatus(500)
+        }
 
-                                user.save((err,user_) => {
-                                    if(err){
-                                        console.log(`Error upserting user: ${err}`)
-                                        res.sendStatus(401)
-                                    }else{
-                                        res.json(this.createToken(user_))
-                                    }
-                                })
-                            }
-                        }).catch( () => res.sendStatus(401))
-                }
-             }).catch( () => {
-                 console.log("could not verify the authenticty of the tokenid")
-                 res.sendStatus(401)
-            })
+        var rank;
 
-    }
-    private client = new OAuth2Client(googleAuthConfig.clientID)
+        try{
+            rank = await zset.zrevrank(user._id.toString())
+        }catch(e){
+            console.log('Error fetching rank: ',e)
+            return res.sendStatus(500)
+        }
 
-    private  verifyIdToken(idToken: string){
-        return new Promise<TokenPayload>((resolve,reject) => {
-            this.client.verifyIdToken({
-                idToken,
-                audience: googleAuthConfig.clientID
-            }).then( ticket => {
-
-                if(!ticket){
-                    reject()
-                }else{
-                    let payload = ticket.getPayload()
-                    resolve(payload)
-                }
-            }).catch( err => {
-                reject(err)
-            })
+        return res.json({
+            score: user.score,
+            showBonus: user.roundCleared,
+            rank: rank + 1,
+            answeredQuestions: user.answeredQuestions
         })
     }
 
-    private createToken(user: IUserModel) : {token: string}{
-        const token: string = sign(user._id.toString(), user.type === UserType.admin)
-        return {token}
+    public async Authenticate(req: Request, res: Response){  // GET
+
+        const authResponse: IAuthResponse = {
+            imageURL: req.user.picture,
+            name: req.user.name,
+            sub: req.user.sub
+        }
+
+        var user;
+
+        try{
+            user = await User.findOne({providerId: authResponse.sub})
+        }catch(e){
+            console.log("Error fetching user: ",e)
+            return res.sendStatus(500)
+        }
+
+        if(!user){
+            try{
+                user = await User.create(<IUserModel>{
+                    fullName: authResponse.name,
+                    providerId: authResponse.sub,
+                    imageURL: authResponse.imageURL
+                })
+            }catch(e){
+                console.log('Error creating new user: ',e)
+                return res.sendStatus(500)
+            }
+        }else{
+            user.set(<IUserModel>{
+                fullName: authResponse.name,
+                providerId: authResponse.sub,
+                imageURL: authResponse.imageURL
+            })
+
+            try{
+                await user.save()
+            }catch(e){
+                console.log('Error updating user: ',e)
+                return res.sendStatus(500)
+            }
+        }
+
+        try{
+            await LeaderboardApi.updateScore(user._id.toString(),user.score,user.lastScoreUpdate)
+        }catch(e){
+            console.log('Error updating leaderboard: ',e)
+            return res.sendStatus(500)
+        }
+
+        var rank;
+
+        try{
+            rank = await zset.zrevrank(user._id.toString())
+        }catch(e){
+            console.log('Error fetching rank: ',e)
+            return res.sendStatus(500)
+        }
+
+        return res.json({
+            score: user.score,
+            showBonus: user.roundCleared,
+            rank: rank + 1,
+            answeredQuestions: user.answeredQuestions
+        })
     }
+    
 }
 
 export const userApi = new UserApi()

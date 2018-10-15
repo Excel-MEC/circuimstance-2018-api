@@ -16,7 +16,7 @@ export interface IQuestionModel extends Document{
     type: QuestionType
     title: string
     description: string
-    answertype: AnswerType
+    answerType: AnswerType
     answer: string | number
     precision: number
 }
@@ -29,6 +29,7 @@ export interface IRoundModel extends Document{
     imageURL: string
 
     description: string
+    openingTime: number
 
     questions: IQuestionModel[]
 

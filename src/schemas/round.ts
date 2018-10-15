@@ -34,7 +34,7 @@ const QuestionSchema = new Schema({
     precision: {
         required: false,
         type: Number
-    }
+    },
 })
 
 export const RoundSchema = new Schema({
@@ -57,6 +57,10 @@ export const RoundSchema = new Schema({
     },
     decription:{
         type: String
+    },
+    openingTime:{
+        required: true,
+        type: Number
     },
     questions: [QuestionSchema]
 })

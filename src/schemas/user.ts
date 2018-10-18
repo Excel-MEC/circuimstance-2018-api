@@ -24,6 +24,11 @@ export const UserSchema: Schema = new Schema({
         required: true,
         default: 0
     },
+    bonusScore:{
+        type: Number,
+        required: true,
+        default: 0
+    },
     round: {
         type: Number,
         required: true,

@@ -4,7 +4,6 @@ import { User } from '../schemas/user';
 import { Types } from 'mongoose';
 import { Socket } from 'socket.io';
 import { LEADERBOARD_SNAPSHOT } from '../config/socket';
-import { promisify } from 'util';
 import { Request, Response } from 'express';
 
 class LeaderboardApi{
@@ -34,7 +33,7 @@ class LeaderboardApi{
 
     public async updateScore(userId: string, score: number, lastScoreUpdate: Date){
         const delta = lastScoreUpdate.getSeconds() - this.TIME_MIN
-        console.log("adding score to zset")
+        console.log("adding score to zset: ", delta)
         this.zset.zadd(score - Math.tanh(delta) ,userId)
 
         var snapshot: any
@@ -92,6 +91,7 @@ class LeaderboardApi{
         for(var i = 0; i < userlist.length; ++i ){
             const user = userlist[i]
             const delta = user.lastScoreUpdate.getSeconds() - firstUser.lastScoreUpdate.getSeconds()
+            console.log("user: ",user," delta: ",delta," rank score: ",user.score - Math.tanh(delta))
             await this.zset.zadd(user.score - Math.tanh(delta),user._id.toString())
         }
 

@@ -7,6 +7,7 @@ export interface IUser{
     fullName: string
     providerId: string
     score: number
+    bonusScore: number
     round: number
     lastScoreUpdate: Date
     roundCleared: boolean

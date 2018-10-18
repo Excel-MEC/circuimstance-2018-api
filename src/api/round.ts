@@ -5,6 +5,7 @@ import { QuestionType, AnswerType, IRoundModel } from '../interfaces/round'
 import LeaderboardApi from '../api/leaderboard'
 
 import { Request, Response } from 'express';
+import { IAnsweredQuestion } from '../interfaces/user';
 
 class RoundApi{
 
@@ -50,7 +51,7 @@ class RoundApi{
 
             const question = questions[0]
 
-            if(user.score < round.qualifyingScore && question.type === QuestionType.bonus) return res.sendStatus(401)
+            if((user.score - user.bonusScore) < round.qualifyingScore && question.type === QuestionType.bonus) return res.sendStatus(401)
 
             var isAnswerCorrect = false
 
@@ -66,16 +67,29 @@ class RoundApi{
             if(isAnswerCorrect){
                 const now = new Date()
 
+                const newScore = user.score + question.point
+                var newBonusScore = user.bonusScore
+
+                if(question.type === QuestionType.bonus){
+                    newBonusScore += question.point
+                }
+
                 user.set({
-                    answeredQuestions: user.answeredQuestions.concat([questionId]),
-                    score: user.score + question.point,
+                    answeredQuestions: user.answeredQuestions.concat([
+                        <IAnsweredQuestion>{
+                            questionId,
+                            round: round.roundNum
+                        }
+                    ]),
+                    bonusScore: newBonusScore,
+                    score: newScore,
                     lastScoreUpdate: now
                 })
 
                 try{
                     await Promise.all([
                         user.save(),
-                        LeaderboardApi.updateScore(user._id.toString(),user.score,now)
+                        LeaderboardApi.updateScore(user._id.toString(),newScore,now)
                     ])
                 }catch(e){
                     console.log('Error updating user score: ',e)
@@ -162,11 +176,13 @@ class RoundApi{
         var user
         const sub = req.user.sub
         try{
-            user = await User.findOne({sub})
+            user = await User.findOne({providerId:sub})
         }catch(e){
             console.log('Error fetching user: ',e)
             return res.sendStatus(500)
         }
+
+        console.log("user fetched ",user)
 
         if(!user) return res.sendStatus(400)
 
@@ -177,11 +193,15 @@ class RoundApi{
             console.log('Error fetching round: ',e)
         }
 
+        console.log("round fetched: ",round)
+
         if(!round) return res.sendStatus(500)
 
-        if(user.score < round.qualifyingScore){
+        if((user.score - user.bonusScore) < round.qualifyingScore){
             return res.sendStatus(401)
         }
+
+        console.log("setting user")
 
         user.set({
             round: user.round + 1

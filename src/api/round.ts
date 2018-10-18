@@ -113,6 +113,7 @@ class RoundApi{
                 levelComplete,
                 questions: round.questions.map( (question ) => ({
                     id: question._id.toString(),
+                    imageURL: !bonusEligible && question.type === QuestionType.bonus? '': question.imageURL,
                     answered: answeredQuestions.indexOf(question._id.toString()) !== -1,
                     isBonus: question.type === QuestionType.bonus,
                     title: !bonusEligible && question.type === QuestionType.bonus? '': question.title,
@@ -263,6 +264,7 @@ class RoundApi{
                 bonusEligible,
                 questions: round.questions.map( (question ) => ({
                     id: question._id.toString(),
+                    imageURL: !bonusEligible && question.type === QuestionType.bonus? '': question.imageURL,
                     answered: answeredQuestions.indexOf(question._id.toString()) !== -1,
                     isBonus: question.type === QuestionType.bonus,
                     title: !bonusEligible && question.type === QuestionType.bonus? '': question.title,

@@ -19,6 +19,7 @@ export interface IQuestionModel extends Document{
     answerType: AnswerType
     answer: string | number
     precision: number
+    imageURL: string
 }
 
 

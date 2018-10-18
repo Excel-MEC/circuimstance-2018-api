@@ -14,6 +14,10 @@ const QuestionSchema = new Schema({
         type:Number,
         default: QuestionType.regular,
     },
+    imageURL:{
+        type: String,
+        default: ''
+    },
     title: {
         required: true,
         type: String

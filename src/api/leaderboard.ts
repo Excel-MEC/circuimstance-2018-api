@@ -80,7 +80,7 @@ class LeaderboardApi{
     public async populateZset(){
         console.log("Populating redis")
         await this.zset.del()
-        const userlist = await User.find({},{_id:1,score:1, lastScoreUpdate:1})
+        const userlist = await User.find({},{_id:1,score:1, lastScoreUpdate:1,fullName:1})
         const firstUser = await User.findOne({},{lastScoreUpdate: 1}).sort({lastScoreUpdate:-1})
         if(!firstUser){
             throw Error(`Cannot find start time`)
@@ -90,7 +90,7 @@ class LeaderboardApi{
         
         for(var i = 0; i < userlist.length; ++i ){
             const user = userlist[i]
-            const delta = user.lastScoreUpdate.getSeconds() - firstUser.lastScoreUpdate.getSeconds()
+            const delta = user.lastScoreUpdate.getSeconds() - this.TIME_MIN
             console.log("user: ",user," delta: ",delta," rank score: ",user.score - Math.tanh(delta))
             await this.zset.zadd(user.score - Math.tanh(delta),user._id.toString())
         }

@@ -32,9 +32,10 @@ class LeaderboardApi{
     }
 
     public async updateScore(userId: string, score: number, lastScoreUpdate: Date){
-        const delta = lastScoreUpdate.getSeconds() - this.TIME_MIN
-        console.log("adding score to zset: ", delta)
-        this.zset.zadd(score - Math.tanh(delta) ,userId)
+        const rankScore = this.calculateScore(score,lastScoreUpdate)
+        // const delta = lastScoreUpdate.getSeconds() - this.TIME_MIN
+        console.log("adding score to zset: ", rankScore)
+        this.zset.zadd(rankScore ,userId)
 
         var snapshot: any
 
@@ -76,23 +77,34 @@ class LeaderboardApi{
 
         return dataOrdered
     }
+
+    private calculateScore(score: number,lastScoreUpdate: Date){
+        const timeDelta = Math.round(Math.abs(this.TIME_MIN - lastScoreUpdate)/100)
+        const score = 2*(1/(1+Math.exp(-1e-6*timeDelta)) - 0.5)
+
+        return score
+    }
     
     public async populateZset(){
         console.log("Populating redis")
+        const start_date = 'October 19 2018'
+        this.TIME_MIN = new Date(start_date)
+        console.log("setting starting time to ",this.TIME_MIN)
+
         await this.zset.del()
         const userlist = await User.find({},{_id:1,score:1, lastScoreUpdate:1,fullName:1})
-        const firstUser = await User.findOne({},{lastScoreUpdate: 1}).sort({lastScoreUpdate:-1})
-        if(!firstUser){
-            throw Error(`Cannot find start time`)
-        }
+        // const firstUser = await User.findOne({},{lastScoreUpdate: 1}).sort({lastScoreUpdate:-1})
+        // if(!firstUser){
+            // throw Error(`Cannot find start time`)
+        // }
 
-        this.TIME_MIN = firstUser.lastScoreUpdate.getSeconds()
+        // this.TIME_MIN = firstUser.lastScoreUpdate.getSeconds()
         
         for(var i = 0; i < userlist.length; ++i ){
             const user = userlist[i]
-            const delta = user.lastScoreUpdate.getSeconds() - this.TIME_MIN
-            console.log("user: ",user," delta: ",delta," rank score: ",user.score - Math.tanh(delta))
-            await this.zset.zadd(user.score - Math.tanh(delta),user._id.toString())
+            const rankScore = this.calculateScore(user.score,user.lastScoreUpdate)
+            console.log("user: ",user," rank score: " ,rankScore)
+            await this.zset.zadd(rankScore,user._id.toString())
         }
 
         console.log("Done populating redis cache")

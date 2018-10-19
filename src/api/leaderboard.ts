@@ -8,7 +8,7 @@ import { Request, Response } from 'express';
 
 class LeaderboardApi{
     private zset = zset
-    private count = 5
+    private count = 20
 
     private TIME_MIN: Date
     

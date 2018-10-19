@@ -82,13 +82,13 @@ class LeaderboardApi{
         const diff = this.TIME_MIN.getTime() - lastScoreUpdate.getTime()
         const timeDelta = Math.round(Math.abs(diff)/100)
         const timeScore = 2*(1/(1+Math.exp(-1e-6*timeDelta)) - 0.5)
-
+	console.log("timeDelta: ",timeDelta, "timeScore: ",timeScore)
         return score - timeScore
     }
     
     public async populateZset(){
         console.log("Populating redis")
-        const start_date = 'October 19 2018'
+        const start_date = 'October 17 2018'
         this.TIME_MIN = new Date(start_date)
         console.log("setting starting time to ",this.TIME_MIN)
 

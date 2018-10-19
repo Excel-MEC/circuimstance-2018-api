@@ -80,9 +80,9 @@ class LeaderboardApi{
 
     private calculateScore(score: number,lastScoreUpdate: Date){
         const timeDelta = Math.round(Math.abs(this.TIME_MIN - lastScoreUpdate)/100)
-        const score = 2*(1/(1+Math.exp(-1e-6*timeDelta)) - 0.5)
+        const timeScore = 2*(1/(1+Math.exp(-1e-6*timeDelta)) - 0.5)
 
-        return score
+        return score - timeScore
     }
     
     public async populateZset(){

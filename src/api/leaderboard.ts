@@ -10,7 +10,7 @@ class LeaderboardApi{
     private zset = zset
     private count = 5
 
-    private TIME_MIN: number
+    private TIME_MIN: Date
     
     public onClientJoin(socket: Socket){
         console.log("WS client connected")
@@ -79,7 +79,8 @@ class LeaderboardApi{
     }
 
     private calculateScore(score: number,lastScoreUpdate: Date){
-        const timeDelta = Math.round(Math.abs(this.TIME_MIN - lastScoreUpdate)/100)
+        const diff = this.TIME_MIN.getTime() - lastScoreUpdate.getTime()
+        const timeDelta = Math.round(Math.abs(diff)/100)
         const timeScore = 2*(1/(1+Math.exp(-1e-6*timeDelta)) - 0.5)
 
         return score - timeScore
@@ -112,7 +113,7 @@ class LeaderboardApi{
     }
 
     constructor() {
-        this.TIME_MIN = 0
+        this.TIME_MIN = new Date()
         this.onClientJoin = this.onClientJoin.bind(this)
         this.updateScore = this.updateScore.bind(this)
         this.populateZset = this.populateZset.bind(this)

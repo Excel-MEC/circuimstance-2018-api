@@ -98,7 +98,7 @@ class RoundApi{
 
             }
 
-            const bonusEligible: boolean = user.score >= round.qualifyingScore
+            const bonusEligible: boolean = (user.score - user.bonusScore) >= round.qualifyingScore
 
             const currentRound = round.roundNum
 
